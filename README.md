@@ -18,4 +18,13 @@ You will also notice that you can add accounts. Start by adding your most used a
 
 If for some reason it does not launch, make sure that you have the correct .dat file to play. Also make sure that you have wine installed. If that does not do the trick, start "googling" for help. 
 
+**Additional v1.1 notes**
+
+Release version 1.1. adds support for importing server lists from the serverlist project: 
+https://github.com/acresources/serverslist
+
+First, clone/download their project to get the Servers.xml file. Then, open the launcher, click the new Menu button and then "Import Servers List". Now simply open the Servers.xml file to import the servers list.
+
+Support has also been added for importing and exporting accounts lists. You can now click the Menu button and choose to either export or import an accounts list. Each accounts list is simply a .json file that holds the info for all your accounts. This should make it easier to move this important information between multiple computers you may have that also have the launcher installed.
+
 Note for Linux Mint Cinnamon users (and possibly others), if you want your launcher icon image to appear on the Cinnamon panel, name your icon "icon.png" and place the file in your /resources/app directory. 
