@@ -11,6 +11,11 @@ var app_data = new DataStore({ filename: app_path+'/data/app_data.db', autoload:
 import AppData from './app_data.js';
 const defaultAppData = AppData.defaultAppData();
 
+import xml2js from 'xml2js';
+const fs = window.require("fs");
+const os = window.require('os');
+const ipcRenderer = window.require('electron').ipcRenderer;
+
 var css_template = {};
 const Wrapper = styled.div`
   button {
@@ -115,8 +120,9 @@ class App extends Component {
     super();
     this.running = false;
     this.serverList = React.createRef();
+    this.addDesc = React.createRef();
     this.server_types = ["", "ACE", "GDLE"];
-    this.server_rulesets = ["", "PVE", "PK"];
+    this.server_rulesets = ["", "PvE", "PK"];
 
     this.state = {
       editing_filepath: false,
@@ -132,6 +138,7 @@ class App extends Component {
       add_account_username: "",
       add_account_password: "",
       add_server: "",
+      add_description: "",
       add_ruleset: "",
       add_discord: "",
       add_url: "",
@@ -144,13 +151,95 @@ class App extends Component {
   }
 
   async componentDidMount() {
-    let app_data = await this.getAppData();
-    css_template = app_data.sel_temp_data;
-    this.setState({ filepath: app_data.filepath, accounts: app_data.accounts, servers: app_data.servers }, function() {
+    let ret_app_data = await this.getAppData();
+    css_template = ret_app_data.sel_temp_data;
+    this.setState({ filepath: ret_app_data.filepath, accounts: ret_app_data.accounts, servers: ret_app_data.servers }, function() {
       document.body.style.backgroundColor = "#EAEADA";
       document.body.style.color = "#232303";
       this.setState({loaded: true});
     });
+    ipcRenderer.on('import_servers', function(event, filepath) {
+      var parser = new xml2js.Parser();
+      fs.readFile(filepath, function(err, data) {
+        parser.parseString(data, function (err, result) {
+          if (result.ArrayOfServerItem.ServerItem) {
+            let converted_data = [];
+            for (var i = 0, length = result.ArrayOfServerItem.ServerItem.length; i < length; i++) {
+              if (result.ArrayOfServerItem.ServerItem[i].emu[0].toLowerCase() === "gdl") {
+                result.ArrayOfServerItem.ServerItem[i].emu[0] = "GDLE";
+              }
+              if (result.ArrayOfServerItem.ServerItem[i].type[0].toLowerCase() === "pvp") {
+                result.ArrayOfServerItem.ServerItem[i].type[0] = "PK";
+              }
+              converted_data.push({
+                server: result.ArrayOfServerItem.ServerItem[i].name[0],
+                ruleset: result.ArrayOfServerItem.ServerItem[i].type[0],
+                discord: result.ArrayOfServerItem.ServerItem[i].discord_url[0],
+                url: result.ArrayOfServerItem.ServerItem[i].server_host[0],
+                port: result.ArrayOfServerItem.ServerItem[i].server_port[0],
+                type: result.ArrayOfServerItem.ServerItem[i].emu[0],
+                description: result.ArrayOfServerItem.ServerItem[i].description[0]
+              });
+            }
+            let current_servers = this.state.servers;
+            for (var i = (current_servers.length - 1); i >= 0; i--) {
+              for (var j = (converted_data.length - 1); j >= 0; j--) {
+                if (current_servers[i].server.toLowerCase() === converted_data[j].server.toLowerCase()) {
+                  current_servers.splice(i, 1);
+                  current_servers.push(converted_data[j]);
+                  converted_data.splice(j, 1);
+                }
+              }
+            }
+            for (var i = 0, length = converted_data.length; i < length; i++) {
+              current_servers.push(converted_data[i]);
+            }
+            this.setState({servers: current_servers});
+            app_data.update({}, {$set:{servers: current_servers}});
+          } else {
+            alert("Invalid XML file.");
+          }
+        }.bind(this));
+      }.bind(this));
+    }.bind(this));
+    ipcRenderer.on('import_accounts', function(event, filepath) {
+      fs.readFile(filepath, function(err, data) {
+        let new_accounts = JSON.parse(data);
+        if (typeof new_accounts[0] === "object" && new_accounts[0].hasOwnProperty("server") && new_accounts[0].hasOwnProperty("username") && new_accounts[0].hasOwnProperty("password")) {
+          let current_accounts = this.state.accounts;
+          for (var i = (current_accounts.length - 1); i >= 0; i--) {
+            for (var j = (new_accounts.length - 1); j >= 0; j--) {
+              if (current_accounts[i].username.toLowerCase() === new_accounts[j].username.toLowerCase()) {
+                current_accounts.splice(i, 1);
+                current_accounts.push(new_accounts[j]);
+                new_accounts.splice(j, 1);
+              }
+            }
+          }
+          for (var i = 0, length = new_accounts.length; i < length; i++) {
+            current_accounts.push(new_accounts[i]);
+          }
+          this.setState({accounts: current_accounts});
+          app_data.update({}, {$set:{accounts: current_accounts}});
+        } else {
+          alert("Invalid JSON file.");
+        }
+      }.bind(this));
+    }.bind(this));
+    ipcRenderer.on('export_accounts', function(event, reponse) {
+      if (this.state.accounts.length > 0) {
+        let slash = os.platform() === "win32" ? "\\" : "\/";
+        let filename = slash + "accounts" + new Date().getTime() + ".json";
+        let savePath = app_path + filename;
+        let accounts_json = JSON.stringify(this.state.accounts);
+        fs.writeFile(savePath, accounts_json, function(err) {
+          let message = "File saved at " + savePath;
+          alert(message);
+        }.bind(this));
+      } else {
+        alert("You have not added any accounts to export.");
+      }
+    }.bind(this));
   }
 
   getAppData() {
@@ -189,20 +278,26 @@ class App extends Component {
           let type = "";
           let url = "";
           let port = "";
+          let counter = 0;
           for (var i = 0, length = this.state.servers.length; i < length; i++) {
             if (this.state.servers[i].server.toLowerCase() === server.toLowerCase()) {
+              counter = counter + 1;
               type = this.state.servers[i].type;
               url = this.state.servers[i].url;
               port = this.state.servers[i].port;
             }
           }
-          let command = "";
-          if (type === "ACE") {
-            command = "wine acclient.exe -a " + username + " -v " + password + " -h " + url + ":" + port;
-          } else if (type === "GDLE") {
-            command = "wine acclient.exe -h " + url + " -p " + port + " -a " + username + ":" + password + " -rodat off";
+          if (counter > 0) {
+            let command = "";
+            if (type === "ACE") {
+              command = "wine acclient.exe -a " + username + " -v " + password + " -h " + url + ":" + port;
+            } else if (type === "GDLE") {
+              command = "wine acclient.exe -h " + url + " -p " + port + " -a " + username + ":" + password + " -rodat off";
+            }
+            exec(command, {cwd: filepath});
+          } else {
+            alert("A matching server was not found. You will need to add this server to your servers list before you can connect.");
           }
-          exec(command, {cwd: filepath});
           this.running = false;
         }.bind(this), 1500);
       }
@@ -248,7 +343,7 @@ class App extends Component {
           :
           <div>
             <b>Username:</b> {account.username}<br/>
-            <b>Server:</b> {account.server} ({account.ruleset})<br/>
+            <b>Server:</b> {account.server} { account.ruleset !== "" ? <span>({account.ruleset})</span> : ""}<br/>
             <button onClick={this.connectionAttempt.bind(this, account.server, account.username, account.password)}>Connect</button> <button onClick={this.editAccount.bind(this, i)}>Edit</button>
           </div>
           }
@@ -432,6 +527,7 @@ class App extends Component {
             <b>Edit Ruleset:</b> <select defaultValue={server.ruleset} onBlur={this.handleRulesetEditChange.bind(this)}>
               {this.genOpts(this.server_rulesets)}
             </select><br/>
+            <div><b>Edit Description:</b><br/> <textarea defaultValue={server.description && server.description !== "" ? server.description : ""} onBlur={this.handleDescriptionChange.bind(this)} rows="4" cols="50"></textarea></div>
             <b>Edit Discord:</b> <input defaultValue={server.discord} onBlur={this.handleDiscordEditChange.bind(this)} size="25"/> <br/>
             <b>Edit URL:</b> <input defaultValue={server.url} onBlur={this.handleURLEditChange.bind(this)} size="25"/> <br/>
             <b>Edit Port:</b> <input defaultValue={server.port} onBlur={this.handlePortEditChange.bind(this)} size="3"/> <br/>
@@ -442,7 +538,8 @@ class App extends Component {
           </div>
           :
           <div>
-            <b>Server:</b> {server.server} ({server.ruleset}) <br/>
+            <b>Server:</b> {server.server} { server.ruleset !== "" ? <span>({server.ruleset})</span> : ""}<br/>
+            { server.description && server.description !== "" ? <div><b>Description:</b> {server.description}</div> : "" }
             <b>Discord:</b> {server.discord === "" ? "none" : <a href={server.discord} target="_blank">{server.discord}</a>} <br/>
             <b>URL:</b> {server.url} <br/>
             <b>Port:</b> {server.port} <br/>
@@ -459,6 +556,7 @@ class App extends Component {
   addServer() {
     let server = this.state.add_server;
     let ruleset = this.state.add_ruleset;
+    let description = this.state.add_description;
     let discord = this.state.add_discord;
     let url = this.state.add_url;
     let port = this.state.add_port;
@@ -467,6 +565,7 @@ class App extends Component {
       server = server.trim();
       ruleset = ruleset.trim();
       discord = discord.trim();
+      description = description.trim();
       url = url.trim();
       port = port.trim();
       type = type.trim();
@@ -479,9 +578,10 @@ class App extends Component {
       if (match) {
         alert("You already have a server named " + this.state.add_server + " in your server list.");
       } else {
-        this.state.servers.push({server: server, ruleset: ruleset, discord: discord, url: url, port: port, type: type});
+        this.state.servers.push({server: server, ruleset: ruleset, description: description, discord: discord, url: url, port: port, type: type});
         app_data.update({}, {$set:{servers: this.state.servers}}, function(err, docs) {
-          this.setState({add_server: "", add_ruleset: "", add_discord: "", add_url: "", add_port: "", add_type: ""}, function() {
+          this.setState({add_server: "", add_ruleset: "", add_description: "", add_discord: "", add_url: "", add_port: "", add_type: ""}, function() {
+            this.addDesc.value = "";
             let new_id = 0;
             for (var i = 0, length = this.state.servers.length; i < length; i++) {
               if (this.state.servers[i].server.toLowerCase() === server.toLowerCase()) {
@@ -570,7 +670,9 @@ class App extends Component {
   }
 
   resetServerAdd() {
-    this.setState({add_server: "", add_ruleset: "", add_discord: "", add_url: "", add_port: "", add_type: ""});
+    this.setState({add_server: "", add_ruleset: "", add_description: "", add_discord: "", add_url: "", add_port: "", add_type: ""}, function() {
+      this.addDesc.value = "";
+    });
   }
 
   cancelEditServer() {
@@ -586,6 +688,12 @@ class App extends Component {
   handleRulesetEditChange(event) {
     let state = Object.assign({}, this.state);
     state.edit_servers[state.editing_server].ruleset = event.target.value;
+    this.setState(state);
+  }
+
+  handleDescriptionChange(event) {
+    let state = Object.assign({}, this.state);
+    state.edit_servers[state.editing_server].description = event.target.value;
     this.setState(state);
   }
 
@@ -621,6 +729,10 @@ class App extends Component {
     this.setState({add_ruleset: event.target.value});
   }
 
+  handleDescriptionAddChange(event) {
+    this.setState({add_description: event.target.value});
+  }
+
   handleDiscordAddChange(event) {
     this.setState({add_discord: event.target.value});
   }
@@ -638,7 +750,7 @@ class App extends Component {
   }
 
   render() {
-    const {editing_filepath, filepath, filepath_temp, add_server, add_ruleset, add_url, add_port, add_type, add_discord,
+    const {editing_filepath, filepath, filepath_temp, add_server, add_ruleset, add_description, add_url, add_port, add_type, add_discord,
       add_account_server, add_account_username, add_account_password, loaded} = this.state;
     if (loaded === false) {
       return (
@@ -675,6 +787,7 @@ class App extends Component {
               Ruleset: <select value={add_ruleset} onChange={this.handleRulesetAddChange.bind(this)}>
                 {this.genOpts(this.server_rulesets)}
               </select><br/>
+              Description (optional):<br/> <textarea ref={addDesc => this.addDesc = addDesc} defaultValue={add_description} onBlur={this.handleDescriptionAddChange.bind(this)} rows="4" cols="50"></textarea><br/>
               Discord (optional): <input value={add_discord} onChange={this.handleDiscordAddChange.bind(this)}/><br/>
               URL: <input value={add_url} onChange={this.handleURLAddChange.bind(this)} size="25"/><br/>
               Port: <input value={add_port} onChange={this.handlePortAddChange.bind(this)} size="3"/><br/>
