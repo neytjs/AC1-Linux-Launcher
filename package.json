@@ -16,9 +16,10 @@
     "lodash.clonedeep": "^4.5.0",
     "memoize-one": "^5.1.1",
     "nedb": "^1.8.0",
-    "react": "16.13.1",
-    "react-dom": "16.13.1",
-    "styled-components": "4.3.2"
+    "react": "^16.13.1",
+    "react-dom": "^16.13.1",
+    "styled-components": "^4.3.2",
+    "xml2js": "^0.4.23"
   },
   "devDependencies": {
     "electron": "^8.2.5",
