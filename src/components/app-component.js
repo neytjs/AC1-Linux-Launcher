@@ -3,8 +3,8 @@ import styled from 'styled-components';
 import cloneDeep from 'lodash.clonedeep';
 const {exec} = window.require("child_process");
 
-const remote = window.require('electron').remote;
-var app_path = remote.app.getAppPath('');
+const {app} = window.require('@electron/remote');
+var app_path = app.getAppPath('');
 var DataStore = window.require('nedb');
 var app_data = new DataStore({ filename: app_path+'/data/app_data.db', autoload: true });
 
@@ -16,7 +16,6 @@ const fs = window.require("fs");
 const os = window.require('os');
 const ipcRenderer = window.require('electron').ipcRenderer;
 
-var css_template = {};
 const Wrapper = styled.div`
   button {
     border-radius: 5px;
@@ -152,7 +151,6 @@ class App extends Component {
 
   async componentDidMount() {
     let ret_app_data = await this.getAppData();
-    css_template = ret_app_data.sel_temp_data;
     this.setState({ filepath: ret_app_data.filepath, accounts: ret_app_data.accounts, servers: ret_app_data.servers }, function() {
       document.body.style.backgroundColor = "#EAEADA";
       document.body.style.color = "#232303";
