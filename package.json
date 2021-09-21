@@ -13,6 +13,7 @@
   "license": "ISC",
   "dependencies": {
     "babel-polyfill": "^6.26.0",
+    "@electron/remote": "^2.0.1",
     "lodash.clonedeep": "^4.5.0",
     "memoize-one": "^5.1.1",
     "nedb": "^1.8.0",
@@ -22,7 +23,6 @@
     "xml2js": "^0.4.23"
   },
   "devDependencies": {
-    "electron": "^8.2.5",
     "@babel/core": "^7.5.5",
     "@babel/plugin-proposal-class-properties": "^7.5.5",
     "@babel/plugin-proposal-function-bind": "^7.2.0",
@@ -30,6 +30,7 @@
     "@babel/preset-react": "^7.0.0",
     "babel-loader": "^8.0.6",
     "css-loader": "^3.2.0",
+    "electron": "^14.0.1",
     "style-loader": "^0.19.1",
     "url-loader": "^2.1.0",
     "webpack": "^4.39.2",

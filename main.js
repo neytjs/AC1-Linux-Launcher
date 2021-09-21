@@ -1,5 +1,6 @@
 const { app, Menu, MenuItem, ipcMain, BrowserWindow, dialog } = require('electron');
 const fs = require('fs');
+require('@electron/remote/main').initialize();
 
 app.on('ready', () => {
 	mainWindow = new BrowserWindow({
@@ -7,6 +8,7 @@ app.on('ready', () => {
 		width: 768,
 		webPreferences: {
 			nodeIntegration: true,
+			contextIsolation: false
 		},
 		icon: require('path').join(__dirname, 'icon.png')
 	});
@@ -77,6 +79,7 @@ app.on('ready', () => {
 	mainWindow.loadURL(url);
 	mainWindow.maximize();
 //	mainWindow.webContents.openDevTools();
+    require("@electron/remote/main").enable(mainWindow.webContents);
 });
 
 let darwin = process.platform === 'darwin';
