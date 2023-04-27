@@ -2,7 +2,8 @@ const path = require('path');
 const webpack = require('webpack');
 
 module.exports = {
-  entry: ["babel-polyfill", './src/app.js'],
+  target: 'node',
+  entry: ["babel-polyfill", './src/app.js'], // babel-polyfill is required for use of await async and full es6 features https://babeljs.io/docs/usage/polyfill/
   output: {
     path: path.resolve(__dirname, 'dist'),
     filename: 'bundle.js'

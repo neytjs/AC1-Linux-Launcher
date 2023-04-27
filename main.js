@@ -78,8 +78,8 @@ app.on('ready', () => {
 	mainWindow.setTitle("AC1 Linux Launcher");
 	mainWindow.loadURL(url);
 	mainWindow.maximize();
-//	mainWindow.webContents.openDevTools();
-    require("@electron/remote/main").enable(mainWindow.webContents);
+	//mainWindow.webContents.openDevTools();
+	require("@electron/remote/main").enable(mainWindow.webContents);
 });
 
 let darwin = process.platform === 'darwin';
